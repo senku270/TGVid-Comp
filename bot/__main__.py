@@ -8,6 +8,8 @@ from .config import *
 from .worker import *
 from .devtools import *
 from .FastTelethon import *
+from aiohttp import web
+import asyncio
 LOGS.info("Starting...")
 
 try:
@@ -279,7 +281,7 @@ async def something():
 
 async def startup():
     await start_health_server()  # Start health check server
-
+    await health_check
 ########### Start ############
 
 LOGS.info("Bot has started.")
