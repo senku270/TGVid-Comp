@@ -4,8 +4,8 @@
 from decouple import config
 
 try:
-    APP_ID = config("10419615", cast=int)
-    API_HASH = config("412bca750b8004784adeeafb98e991c5")
+    APP_ID = config("24810254", cast=int)
+    API_HASH = config("aadb42caec01695fa0a77c09b3e0ef47")
     BOT_TOKEN = config("7766680940:AAFRLQDTwpbreK-dZ-kk8fupB6tHkMBwk2g")
     DEV = 7543269959
     OWNER = config("7543269959")
