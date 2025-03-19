@@ -281,10 +281,11 @@ async def something():
 
 async def startup():
     await start_health_server()  # Start health check server
-    await health_check
+
 ########### Start ############
 
 LOGS.info("Bot has started.")
 with bot:
+    bot.loop.run_until_complete(startup())
     bot.loop.run_until_complete(something())
     bot.loop.run_forever()
