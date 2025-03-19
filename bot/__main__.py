@@ -15,6 +15,26 @@ try:
 except Exception as er:
     LOGS.info(er)
 
+######## Health Check ########
+
+async def health_check(request):
+    """Health check route handler"""
+    return web.Response(text="OK", status=200)
+
+async def start_health_server():
+    """Start the health check server"""
+    try:
+        app = web.Application()
+        app.router.add_get('/health', health_check)
+
+        runner = web.AppRunner(app)
+        await runner.setup()
+        site = web.TCPSite(runner, "0.0.0.0", 8080)
+        await site.start()
+        LOGS.info("Health check server started on port 8080")
+
+    except Exception as e:
+        LOGS.info(f"Failed to start health server: {e}")
 
 ####### GENERAL CMDS ########
 
@@ -257,6 +277,8 @@ async def something():
         except Exception as err:
             LOGS.info(err)
 
+async def startup():
+    await start_health_server()  # Start health check server
 
 ########### Start ############
 
