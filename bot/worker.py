@@ -179,17 +179,7 @@ async def encode_video(dl, out, nn, wah, user_info):
             percentage = min(100, (encoded_time / total_duration) * 100)
             progress_bar = generate_progress_bar(percentage)
 
-            # Get current output file size
-            try:
-                if Path(out).exists():
-                    cur_size = int(Path(out).stat().st_size)
-                else:
-                    cur_size = 0
-            except Exception as e:
-                logger.error(f"Error reading current file size: {str(e)}")
-                cur_size = 0
-            speed_mb = (cur_size / (1024 * 1024)) / elapsed_time if elapsed_time > 0 else 0
-
+            encoding_speed = (encoded_time / elapsed_time) if elapsed_time > 0 else 0
             # Compression percentage calculation
             if org_size > 0:
                 compression_percent = 100 - ((cur_size / org_size) * 100)
@@ -218,16 +208,16 @@ async def encode_video(dl, out, nn, wah, user_info):
             status_message = (
                 f"🗜 **Compressing...**\n"
                 f"{progress_bar} {percentage:.2f}%\n\n"
-                f"📊 **OS:** *{org_size_str}*\n"
-                f"📉 **CS:** *{hbs(cur_size)}*\n"
-                f"💯 **Compression:** *{compression_str}*\n\n"
-                f"⏱️ **ETA:** *{eta}* | ⏳ **Encoding Time:** *{timedelta(seconds=int(elapsed_time))}*\n\n"
-                f"🚀 **Speed:** *{speed_mb:.2f}x*\n"
-                f"⌛ **Download Time:** *{download_time_str}*\n"
-                f"⏳ **Approx TM:** **{approx_tm}** | **Approx PRO 2:** __**{approx_pro_2}**__ *(Total time taken)*\n\n"
-                f"🔁 **Tasks:** *{tasks_count}*\n"
+                f"📊 **OS:** _{org_size_str}_\n"
+                f"📉 **CS:** _{hbs(cur_size)}_\n"
+                f"💯 **Compression:** **_{compression_str}_**\n\n"
+                f"⏱️ **ETA:** _{eta}_ | ⏳ **Encoding Time:** _{timedelta(seconds=int(elapsed_time))}_\n\n"
+                f"🚀 **Speed:** **_{encoding_speed:.2f}x_**\n"
+                f"⌛ **Download Time:** **{download_time_str}**\n"
+                f"⏳ **Approx TM:** **{approx_tm}** | **Approx PRO 2:** __**{approx_pro_2}**__\n\n"
+                f"🔁 **Tasks:** **_{tasks_count}_**\n"
                 f"💻 **CPU:** *{stats['cpu']}%* | 🧠 **RAM:** *{stats['ram_used']} ({stats['ram_percent']}%)*\n"
-                f"🗃️ **F STR:** *{free_disk} ({free_disk_percent})* | **Uptime:** *{uptime}*"
+                f"🗃️ **F STR:** {free_disk} ({free_disk_percent}) | **Uptime:** _{uptime}_"
             )
 
             try:
