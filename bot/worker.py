@@ -7,7 +7,6 @@ import time
 import asyncio
 import logging
 import psutil
-import os
 from pathlib import Path
 from datetime import datetime as dt, timedelta
 from telethon import Button
@@ -23,8 +22,6 @@ logging.basicConfig(
 )
 logger = logging.getLogger("VideoEncoder")
 
-# Global variable for the separate Queue-Status message.
-QUEUE_MESSAGE = None
 
 async def get_video_duration(video_path):
     """Get video duration in seconds using ffprobe"""
@@ -42,11 +39,13 @@ async def get_video_duration(video_path):
         logger.info(f"Video duration: {duration} seconds")
         return duration
     except Exception as e:
+        # Default to 1 if we can't get duration to avoid division by zero
         error_msg = stderr.decode()
         logger.error(f"Error getting video duration: {error_msg}")
         logger.error(f"Exception: {str(e)}")
         LOGS.info(f"Error getting video duration: {error_msg}")
         return 1
+
 
 def generate_progress_bar(percentage):
     """Generate a text-based progress bar"""
@@ -55,6 +54,7 @@ def generate_progress_bar(percentage):
     bar = "█" * filled_length + "░" * (bar_length - filled_length)
     logger.debug(f"Generated progress bar at {percentage:.2f}%: {bar}")
     return f"[{bar}]"
+
 
 def get_system_stats():
     """Get current system stats (CPU, RAM)"""
@@ -76,9 +76,9 @@ def get_system_stats():
             "ram_used": "0 GB"
         }
 
+
 async def encode_video(dl, out, nn, wah):
     """Encode video with live progress updates including file size information and elapsed time"""
-    global QUEUE_MESSAGE
     logger.info(f"Starting video encoding: {dl} -> {out}")
     cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
     logger.debug(f"Running command: {cmd}")
@@ -104,6 +104,8 @@ async def encode_video(dl, out, nn, wah):
     # Get download time from metadata if available
     download_time_str = "N/A"
     try:
+        # Assuming download time is stored somewhere or can be calculated
+        # For now, we'll just use a placeholder
         if hasattr(nn, "download_time"):
             download_time_str = ts(nn.download_time)
         else:
@@ -128,92 +130,87 @@ async def encode_video(dl, out, nn, wah):
                 encoded_time = int(match.group(1)) / 1_000_000  # Convert to seconds
                 logger.debug(f"Encoded time: {encoded_time:.2f}s / {total_duration:.2f}s")
 
+        # Throttle updates to avoid Telegram API limits
         current_time = time.time()
         if current_time - last_update_time >= update_interval:
+            # Calculate elapsed encoding time and format it nicely
             elapsed_time = current_time - start_time
-            elapsed_time_str = ts(int(elapsed_time * 1000))
+            elapsed_time_str = ts(int(elapsed_time * 1000))  # Convert to milliseconds for ts function
             
             percentage = min(100, (encoded_time / total_duration) * 100)
             logger.info(f"Encoding progress: {percentage:.2f}%")
             progress_bar = generate_progress_bar(percentage)
 
+            # Calculate encoding speed (in seconds of video per second of real time)
             if elapsed_time > 0:
                 encoding_speed = encoded_time / elapsed_time
                 encoding_speeds.append(encoding_speed)
+                # Use the last 5 speeds to calculate average speed
                 recent_speeds = encoding_speeds[-5:] if len(encoding_speeds) >= 5 else encoding_speeds
                 avg_speed = sum(recent_speeds) / len(recent_speeds)
+
+                # Calculate estimated time remaining
                 remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
                 eta = str(timedelta(seconds=int(remaining_seconds)))
-            else:
-                avg_speed = 0
-                eta = "N/A"
 
-            # Get system stats
-            stats = get_system_stats()
+                # Get system stats
+                stats = get_system_stats()
 
-            try:
-                if Path(out).exists():
-                    cur_size = int(Path(out).stat().st_size)
-                    cur_size_str = hbs(cur_size)
-                    if org_size > 0:
-                        compression_percent = 100 - ((cur_size / org_size) * 100)
-                        compression_str = f"{compression_percent:.2f}%"
+                # Get current output file size
+                try:
+                    if Path(out).exists():
+                        cur_size = int(Path(out).stat().st_size)
+                        cur_size_str = hbs(cur_size)
+
+                        # Calculate compression percentage
+                        if org_size > 0:
+                            compression_percent = 100 - ((cur_size / org_size) * 100)
+                            compression_str = f"{compression_percent:.2f}%"
+                        else:
+                            compression_str = "N/A"
                     else:
+                        cur_size_str = "0 B"
                         compression_str = "N/A"
-                else:
-                    cur_size_str = "0 B"
-                    compression_str = "N/A"
-            except Exception as e:
-                logger.error(f"Error getting current file size: {str(e)}")
-                cur_size_str = "calculating..."
-                compression_str = "calculating..."
+                except Exception as e:
+                    logger.error(f"Error getting current file size: {str(e)}")
+                    cur_size_str = "calculating..."
+                    compression_str = "calculating..."
 
-            # Create status messages
-            status_message = (
-                f"**🗜 Compressing {Path(dl).name}...**\n"
-                f"{progress_bar} {percentage:.2f}%\n\n"
-                f"**📊 Original Size:** {org_size_str}\n"
-                f"**📉 Current Size:** {cur_size_str}\n"
-                f"**💯 Compression:** {compression_str}\n\n"
-                f"**⏱️ ETA:** {eta}\n"
-                f"**🚀 Speed:** {avg_speed:.2f}x\n"
-                f"**⌛ Download Time:** {download_time_str}\n"
-                f"**⏳ Encoding Time:** {elapsed_time_str}\n"
-                f"**💻 CPU:** {stats['cpu']}%\n"
-                f"**🧠 RAM:** {stats['ram_used']} ({stats['ram_percent']}%)"
-            )
+                # Create the status message with file size information and elapsed times
+                status_message = (
+                    f"**🗜 Compressing...**\n"
+                    f"{progress_bar} {percentage:.2f}%\n\n"
+                    f"**📊 Original Size:** {org_size_str}\n"
+                    f"**📉 Current Size:** {cur_size_str}\n"
+                    f"**💯 Compression:** {compression_str}\n\n"
+                    f"**⏱️ ETA:** {eta}\n"
+                    f"**🚀 Speed:** {avg_speed:.2f}x\n"
+                    f"**⌛ Download Time:** {download_time_str}\n"
+                    f"**⏳ Encoding Time:** {elapsed_time_str}\n"
+                    f"**💻 CPU:** {stats['cpu']}%\n"
+                    f"**🧠 RAM:** {stats['ram_used']} ({stats['ram_percent']}%)"
+                )
 
-            # Update individual file progress message and the separate queue-status message
-            try:
-                # Update file progress message
-                await nn.edit(status_message, buttons=[
-                    [Button.inline("STATS", data=f"stats{wah}")],
-                    [Button.inline("CANCEL", data=f"skip{wah}")],
-                ])
-
-                # Update the Queue-Status message (assumes QUEUE_MESSAGE has been set)
-                queue_status = "**📋 Queue Status:**\n"
-                for index, (file_id, file_data) in enumerate(QUEUE.items()):
-                    file_name = file_data[0]
-                    if file_name == Path(dl).name:
-                        status = f"🔄 {generate_progress_bar(percentage)} {percentage:.2f}%"
-                    elif index == 0:
-                        status = "🔄 Processing..."
-                    else:
-                        status = "⏳ Waiting..."
-                    queue_status += f"{status} {file_name}\n"
-                if QUEUE_MESSAGE:
-                    await QUEUE_MESSAGE.edit(queue_status)
-                last_update_time = current_time
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"Progress update error: {error_msg}")
-                LOGS.info(f"Progress update error: {error_msg}")
+                try:
+                    await nn.edit(
+                        status_message,
+                        buttons=[
+                            [Button.inline("STATS", data=f"stats{wah}")],
+                            [Button.inline("CANCEL", data=f"skip{wah}")],
+                        ],
+                    )
+                    logger.debug("Successfully updated progress message")
+                    last_update_time = current_time
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"Progress update error: {error_msg}")
+                    LOGS.info(f"Progress update error: {error_msg}")
 
     logger.info("Encoding process completed, waiting for final output")
     stdout, stderr = await process.communicate()
     error_output = stderr.decode()
 
+    # Calculate total encoding time
     total_encoding_time = time.time() - start_time
     logger.info(f"Total encoding time: {ts(int(total_encoding_time * 1000))}")
 
@@ -221,23 +218,6 @@ async def encode_video(dl, out, nn, wah):
         logger.error(f"FFMPEG error output: {error_output}")
     else:
         logger.info("Encoding completed successfully")
-
-    # Remove processed file from the queue and update Queue-Status message
-    for key, file_data in list(QUEUE.items()):
-        if file_data[0] == Path(dl).name:
-            del QUEUE[key]
-    queue_status = "**📋 Queue Status:**\n"
-    for index, (file_id, file_data) in enumerate(QUEUE.items()):
-        file_name = file_data[0]
-        if index == 0:
-            status = "🔄 Processing..."
-        else:
-            status = "⏳ Waiting..."
-        queue_status += f"{status} {file_name}\n"
-    if not QUEUE:
-        queue_status += "✅ All tasks completed!"
-    if QUEUE_MESSAGE:
-        await QUEUE_MESSAGE.edit(queue_status)
 
     return error_output
 
@@ -261,10 +241,12 @@ async def stats(e):
 
         out, dl, id = parts
 
+        # Check if files exist
         if not Path(out).exists() or not Path(dl).exists():
             logger.error(f"File not found. Output: {Path(out).exists()}, Download: {Path(dl).exists()}")
             return await e.answer("Files no longer exist. Process may have completed.", cache_time=0, alert=True)
 
+        # Get file sizes safely
         try:
             ot = hbs(int(Path(out).stat().st_size))
             ov = hbs(int(Path(dl).stat().st_size))
@@ -272,6 +254,7 @@ async def stats(e):
             logger.error(f"Error getting file sizes: {size_err}")
             return await e.answer("Error reading file sizes. Please try again.", cache_time=0, alert=True)
 
+        # Calculate compression percentage
         try:
             org = int(Path(dl).stat().st_size)
             com = int(Path(out).stat().st_size)
@@ -281,11 +264,16 @@ async def stats(e):
             logger.error(f"Error calculating percentage: {calc_err}")
             per = "calculating..."
 
+        # Get system stats
         sys_stats = get_system_stats()
         
+        # Get encoding speed (if available)
         try:
+            # Get video duration
             total_duration = await get_video_duration(dl)
+            # Check output file size for progress
             if Path(out).exists():
+                # This is a rough estimate based on file size ratio
                 progress_ratio = Path(out).stat().st_size / Path(dl).stat().st_size
                 estimated_encoded_seconds = total_duration * progress_ratio
                 encoding_rate = f"{estimated_encoded_seconds / total_duration:.2f}x"
@@ -319,11 +307,11 @@ async def stats(e):
             alert=True
         )
 
+
 async def dl_link(event):
-    global QUEUE_MESSAGE
     if not event.is_private:
         return
-    if str(event.sender_id) not in OWNER and event.sender_id != DEV:
+    if str(event.sender_id) not in OWNER and event.sender_id !=DEV:
         return
     link, name = "", ""
     try:
@@ -356,9 +344,6 @@ async def dl_link(event):
     dtime = ts(int((es - s).seconds) * 1000)
     hehe = f"{out};{dl};0"
     wah = code(hehe)
-    # Create a separate Queue-Status message if not already present.
-    if QUEUE_MESSAGE is None:
-        QUEUE_MESSAGE = await xxx.client.send_message(xxx.chat_id, "**📋 Queue Status:**\n🔄 Updating...")
     nn = await xxx.edit(
         "**🗜 Compressing...**",
         buttons=[
@@ -367,6 +352,7 @@ async def dl_link(event):
         ],
     )
 
+    # Use the enhanced encoding function with progress bar
     er = await encode_video(dl, out, nn, wah)
 
     try:
@@ -410,23 +396,27 @@ async def dl_link(event):
     os.remove(out)
     WORKING.clear()
 
+
 async def encod(event):
-    global QUEUE_MESSAGE
     try:
         if not event.is_private:
             return
-        if str(event.sender_id) not in OWNER and event.sender_id != DEV:
+        event.sender
+        if str(event.sender_id) not in OWNER and event.sender_id !=DEV:
             return await event.reply("**Sorry You're not An Authorised User!**")
         if not event.media:
             return
         if hasattr(event.media, "document"):
-            if not event.media.document.mime_type.startswith(("video", "application/octet-stream")):
+            if not event.media.document.mime_type.startswith(
+                ("video", "application/octet-stream")
+            ):
                 return
         else:
             return
         if WORKING or QUEUE:
             time.sleep(2)
             xxx = await event.reply("**Adding To Queue...**")
+            # id = pack_bot_file_id(event.media)
             doc = event.media.document
             if doc.id in list(QUEUE.keys()):
                 return await xxx.edit("**This File is Already Added in Queue**")
@@ -434,7 +424,9 @@ async def encod(event):
             if not name:
                 name = "video_" + dt.now().isoformat("_", "seconds") + ".mp4"
             QUEUE.update({doc.id: [name, doc]})
-            return await xxx.edit("**Added This File in Queue**")
+            return await xxx.edit(
+                "**Added This File in Queue**"
+            )
         WORKING.append(1)
         xxx = await event.reply("**📥 Downloading...**")
         s = dt.now()
@@ -453,7 +445,13 @@ async def encod(event):
                         location=file,
                         out=f,
                         progress_callback=lambda d, t: asyncio.get_event_loop().create_task(
-                            progress(d, t, xxx, ttt, f"**📥 Downloading**\n__{filename}__")
+                            progress(
+                                d,
+                                t,
+                                xxx,
+                                ttt,
+                                f"**📥 Downloading**\n__{filename}__",
+                            )
                         ),
                     )
             else:
@@ -480,8 +478,6 @@ async def encod(event):
         e = xxx
         hehe = f"{out};{dl};0"
         wah = code(hehe)
-        if QUEUE_MESSAGE is None:
-            QUEUE_MESSAGE = await event.client.send_message(event.chat_id, "**📋 Queue Status:**\n🔄 Updating...")
         nn = await e.edit(
             "**🗜 Compressing...**",
             buttons=[
@@ -490,6 +486,7 @@ async def encod(event):
             ],
         )
 
+        # Use the enhanced encoding function with progress bar
         er = await encode_video(dl, out, nn, wah)
 
         try:
@@ -498,7 +495,7 @@ async def encod(event):
                 WORKING.clear()
                 os.remove(dl)
                 return os.remove(out)
-        except BaseException as er:
+        except BaseException:
             pass
 
         ees = dt.now()
@@ -522,11 +519,11 @@ async def encod(event):
         eees = dt.now()
         x = dtime
         xx = ts(int((ees - es).seconds) * 1000)
-        xxx_time = ts(int((eees - ees).seconds) * 1000)
+        xxx = ts(int((eees - ees).seconds) * 1000)
         a1 = await info(dl, e)
         a2 = await info(out, e)
-        dk = f"<b>File Name:</b> {newFile}\n\n<b>Original File Size:</b> {hbs(org)}\n<b>Encoded File Size:</b> {hbs(com)}\n<b>Encoded Percentage:</b> {per}\n\n<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx_time}</i>"
-        ds = await event.client.send_file(
+        dk = f"<b>File Name:</b> {newFile}\n\n<b>Original File Size:</b> {hbs(org)}\n<b>Encoded File Size:</b> {hbs(com)}\n<b>Encoded Percentage:</b> {per}\n\n<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx}</i>"
+        ds = await e.client.send_file(
             e.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
         )
         os.remove(dl)
