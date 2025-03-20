@@ -120,7 +120,6 @@ def format_elapsed(seconds):
     minutes, sec = divmod(int(seconds), 60)
     return f"{minutes}m, {sec}s"
 
-
 async def encode_video(dl, out, nn, wah, user_info):
     """Encode video with live progress updates using new progress layout.
     user_info is a tuple: (username, user_id)
@@ -136,7 +135,6 @@ async def encode_video(dl, out, nn, wah, user_info):
     total_duration = await get_video_duration(dl)
     logger.info(f"Total video duration: {total_duration} seconds")
 
-    # Get original file size
     org_size = int(Path(dl).stat().st_size)
     org_size_str = hbs(org_size)
     logger.info(f"Original file size: {org_size_str}")
@@ -145,18 +143,14 @@ async def encode_video(dl, out, nn, wah, user_info):
     start_time = time.time()
     update_interval = 3  # seconds
     last_update_time = start_time
-    encoding_speeds = []  # to track speed for ETA
+    encoding_speeds = []
 
-    # Get download time from metadata if available
     download_time_str = "N/A"
     try:
         if hasattr(nn, "download_time"):
             download_time_str = ts(nn.download_time)
-        else:
-            download_time_str = "N/A"
     except Exception as e:
         logger.error(f"Error getting download time: {str(e)}")
-        download_time_str = "N/A"
 
     logger.info("Starting encoding progress monitoring")
     while True:
@@ -180,59 +174,50 @@ async def encode_video(dl, out, nn, wah, user_info):
             progress_bar = generate_progress_bar(percentage)
 
             encoding_speed = (encoded_time / elapsed_time) if elapsed_time > 0 else 0
-            # Compression percentage calculation
-            if org_size > 0:
-                compression_percent = 100 - ((cur_size / org_size) * 100)
-                compression_str = f"{compression_percent:.2f}%"
-            else:
-                compression_str = "N/A"
+            cur_size = int(Path(out).stat().st_size) if Path(out).exists() else 0
 
-            # Estimated remaining time (ETA) based on average speed
+            compression_percent = 100 - ((cur_size / org_size) * 100) if org_size > 0 else "N/A"
+            compression_str = f"{compression_percent:.2f}%" if isinstance(compression_percent, float) else "N/A"
+
             avg_speed = encoded_time / elapsed_time if elapsed_time > 0 else 0
             remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
             eta = str(timedelta(seconds=int(remaining_seconds)))
 
-            # Compute the two approximate completion values:
-            # Approx TM: Clock time when encoding will complete.
             approx_tm = dt.fromtimestamp(start_time + elapsed_time + remaining_seconds + 1).strftime("%H:%M:%S")
-            # Approx PRO 2: Total time (elapsed + remaining) formatted.
             approx_pro_2 = str(timedelta(seconds=int(elapsed_time + remaining_seconds)))
 
-            # Get system stats
             stats = get_system_stats()
             free_disk, free_disk_percent = get_disk_stats()
             uptime = get_uptime()
             tasks_count = len(WORKING) + len(QUEUE) if (WORKING or QUEUE) else 0
 
-            # Build the new progress message with the requested formatting.
             status_message = (
                 f"🗜 **Compressing...**\n"
-                f"{progress_bar} {percentage:.2f}%\n\n"
-                f"📊 **OS:** _{org_size_str}_\n"
-                f"📉 **CS:** _{hbs(cur_size)}_\n"
-                f"💯 **Compression:** **_{compression_str}_**\n\n"
-                f"⏱️ **ETA:** _{eta}_ | ⏳ **Encoding Time:** _{timedelta(seconds=int(elapsed_time))}_\n\n"
-                f"🚀 **Speed:** **_{encoding_speed:.2f}x_**\n"
-                f"⌛ **Download Time:** **{download_time_str}**\n"
-                f"⏳ **Approx TM:** **{approx_tm}** | **Approx PRO 2:** __**{approx_pro_2}**__\n\n"
-                f"🔁 **Tasks:** **_{tasks_count}_**\n"
-                f"💻 **CPU:** *{stats['cpu']}%* | 🧠 **RAM:** *{stats['ram_used']} ({stats['ram_percent']}%)*\n"
-                f"🗃️ **F STR:** {free_disk} ({free_disk_percent}) | **Uptime:** _{uptime}_"
+                f"{progress_bar} **{percentage:.2f}%**\n\n"
+                f"📊 **Original Size:** __{org_size_str}__\n"
+                f"📉 **Current Size:** __{hbs(cur_size)}__\n"
+                f"💯 **Compression:** __{compression_str}__\n\n"
+                f"⏱️ **ETA:** __{eta}__ | ⏳ **Encoding Time:** __{timedelta(seconds=int(elapsed_time))}__\n\n"
+                f"🚀 **Speed:** __{encoding_speed:.2f}x__\n"
+                f"⌛ **Download Time:** __{download_time_str}__\n"
+                f"⏳ **Approx Completion:** __{approx_tm}__ | **Total Estimated Time:** __{approx_pro_2}__\n\n"
+                f"🔁 **Tasks:** __{tasks_count}__\n"
+                f"💻 **CPU:** __{stats['cpu']}%__ | 🧠 **RAM:** __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
+                f"🗃️ **Free Space:** __{free_disk} ({free_disk_percent})__ | **Uptime:** __{uptime}__"
             )
 
             try:
                 await nn.edit(
                     status_message,
                     buttons=[
-                        [Button.inline("STATS", data=f"stats{wah}")],
-                        [Button.inline("CANCEL", data=f"skip{wah}")],
+                        [Button.inline("📊 STATS", data=f"stats{wah}")],
+                        [Button.inline("❌ CANCEL", data=f"skip{wah}")],
                     ],
                 )
                 logger.debug("Progress message updated")
                 last_update_time = current_time
             except Exception as e:
                 logger.error(f"Progress update error: {str(e)}")
-                LOGS.info(f"Progress update error: {str(e)}")
 
     logger.info("Encoding process completed, waiting for final output")
     stdout, stderr = await process.communicate()
@@ -247,7 +232,6 @@ async def encode_video(dl, out, nn, wah, user_info):
         logger.info("Encoding completed successfully")
 
     return error_output
-
 
 async def stats(e):
     """Handle stats button press with enhanced information"""
