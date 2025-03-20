@@ -145,13 +145,6 @@ async def encode_video(dl, out, nn, wah, user_info):
     last_update_time = start_time
     encoding_speeds = []
 
-    download_time_str = "N/A"
-    try:
-        if hasattr(nn, "download_time"):
-            download_time_str = ts(nn.download_time)
-    except Exception as e:
-        logger.error(f"Error getting download time: {str(e)}")
-
     logger.info("Starting encoding progress monitoring")
     while True:
         line = await process.stdout.readline()
@@ -176,15 +169,13 @@ async def encode_video(dl, out, nn, wah, user_info):
             encoding_speed = (encoded_time / elapsed_time) if elapsed_time > 0 else 0
             cur_size = int(Path(out).stat().st_size) if Path(out).exists() else 0
 
-            compression_percent = 100 - ((cur_size / org_size) * 100) if org_size > 0 else "N/A"
+            compression_percent = 100 - ((cur_size / org_size) * 100) if org_size > 0 else 0
             compression_str = f"{compression_percent:.2f}%" if isinstance(compression_percent, float) else "N/A"
 
             avg_speed = encoded_time / elapsed_time if elapsed_time > 0 else 0
             remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
             eta = str(timedelta(seconds=int(remaining_seconds)))
-
-            approx_tm = dt.fromtimestamp(start_time + elapsed_time + remaining_seconds + 1).strftime("%H:%M:%S")
-            approx_pro_2 = str(timedelta(seconds=int(elapsed_time + remaining_seconds)))
+            est = str(timedelta(seconds=int(elapsed_time + remaining_seconds)))  # Total estimated time
 
             stats = get_system_stats()
             free_disk, free_disk_percent = get_disk_stats()
@@ -192,18 +183,13 @@ async def encode_video(dl, out, nn, wah, user_info):
             tasks_count = len(WORKING) + len(QUEUE) if (WORKING or QUEUE) else 0
 
             status_message = (
-                f"🗜 **Compressing...**\n"
-                f"{progress_bar} **{percentage:.2f}%**\n\n"
-                f"📊 **Original Size:** __{org_size_str}__\n"
-                f"📉 **Current Size:** __{hbs(cur_size)}__\n"
-                f"💯 **Compression:** __{compression_str}__\n\n"
-                f"⏱️ **ETA:** __{eta}__ | ⏳ **Encoding Time:** __{timedelta(seconds=int(elapsed_time))}__\n\n"
-                f"🚀 **Speed:** __{encoding_speed:.2f}x__\n"
-                f"⌛ **Download Time:** __{download_time_str}__\n"
-                f"⏳ **Approx Completion:** __{approx_tm}__ | **Total Estimated Time:** __{approx_pro_2}__\n\n"
-                f"🔁 **Tasks:** __{tasks_count}__\n"
-                f"💻 **CPU:** __{stats['cpu']}%__ | 🧠 **RAM:** __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
-                f"🗃️ **Free Space:** __{free_disk} ({free_disk_percent})__ | **Uptime:** __{uptime}__"
+                f"┏ **⎘** __{Path(dl).name}__ | __{percentage:.2f}%__ ⟳\n"
+                f"┃ [{progress_bar}]\n"
+                f"┖ **❖** **OG:** __{org_size_str}__ **→** **ENC:** __{hbs(cur_size)}__ ({compression_str})\n\n"
+                f"**⚡ SPEED:** __{encoding_speed:.2f}x__  | **⧖ ETA:** __{eta}__\n"
+                f"**⧗ ELT:** __{timedelta(seconds=int(elapsed_time))}__  | **⌖ EST:** __{est}__\n\n"
+                f"**᚛᚜ TASK:** __{tasks_count}__ | **⌬ CPU:** __{stats['cpu']}%__ | **🜁 RAM:** __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
+                f"**⌸ FREE SPACE:** __{free_disk}__ (__{free_disk_percent}__)"
             )
 
             try:
