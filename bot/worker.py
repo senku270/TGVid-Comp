@@ -183,13 +183,13 @@ async def encode_video(dl, out, nn, wah, user_info):
             tasks_count = len(WORKING) + len(QUEUE) if (WORKING or QUEUE) else 0
 
             status_message = (
-                f"┏ **⎘** __{Path(dl).name}__ | __{percentage:.2f}%__ ⟳\n"
-                f"┃ [{progress_bar}]\n"
-                f"┖ **❖** **OG:** __{org_size_str}__ **→** **ENC:** __{hbs(cur_size)}__ ({compression_str})\n\n"
-                f"**⚡ SPEED:** __{encoding_speed:.2f}x__  | **⧖ ETA:** __{eta}__\n"
-                f"**⧗ ELT:** __{timedelta(seconds=int(elapsed_time))}__  | **⌖ EST:** __{est}__\n\n"
-                f"**᚛᚜ TASK:** __{tasks_count}__ | **⌬ CPU:** __{stats['cpu']}%__ | **🜁 RAM:** __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
-                f"**⌸ FREE SPACE:** __{free_disk}__ (__{free_disk_percent}__)"
+                f"**⎘** __{Path(dl).name}__ | __{percentage:.2f}%__ **⟳**\n"
+                f"{progress_bar}\n"
+                f"**❖** 𝗢𝗚: __{org_size_str}__ **→** 𝗘𝗡𝗖: __{hbs(cur_size)}__ **__({compression_str})__**\n\n"
+                f"**⚡** 𝗦𝗣𝗘𝗘𝗗: **__{encoding_speed:.2f}x__**  | ** ⧖** 𝗘𝗧𝗔: __{eta}__\n"
+                f"** ⧗** 𝗘𝗟𝗧: __{timedelta(seconds=int(elapsed_time))}__  | **⌖** 𝗘𝗦𝗧: **__{est}__""\n\n"
+                f"** ᚛᚜** 𝗧𝗔𝗦𝗞: __{tasks_count}__ | **⌬** 𝗖𝗣𝗨: __{stats['cpu']}%__ | ** 🜁** 𝗥𝗔𝗠: __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
+                f"**⌸** 𝗙 𝗦𝗧𝗢𝗥𝗔𝗚𝗘: __{free_disk}__ (__{free_disk_percent}__)"
             )
 
             try:
