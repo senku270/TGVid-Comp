@@ -78,7 +78,7 @@ def get_system_stats():
 
 
 async def encode_video(dl, out, nn, wah):
-    """Encode video with live progress updates including file size information"""
+    """Encode video with live progress updates including file size information and elapsed time"""
     logger.info(f"Starting video encoding: {dl} -> {out}")
     cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
     logger.debug(f"Running command: {cmd}")
@@ -89,7 +89,7 @@ async def encode_video(dl, out, nn, wah):
 
     total_duration = await get_video_duration(dl)  # Get video duration in seconds
     logger.info(f"Total video duration: {total_duration} seconds")
-    
+
     # Get original file size
     org_size = int(Path(dl).stat().st_size)
     org_size_str = hbs(org_size)
@@ -100,6 +100,19 @@ async def encode_video(dl, out, nn, wah):
     update_interval = 3  # Update the progress message every 3 seconds
     last_update_time = start_time
     encoding_speeds = []  # To track encoding speed over time
+
+    # Get download time from metadata if available
+    download_time_str = "N/A"
+    try:
+        # Assuming download time is stored somewhere or can be calculated
+        # For now, we'll just use a placeholder
+        if hasattr(nn, "download_time"):
+            download_time_str = ts(nn.download_time)
+        else:
+            download_time_str = "N/A"
+    except Exception as e:
+        logger.error(f"Error getting download time: {str(e)}")
+        download_time_str = "N/A"
 
     logger.info("Starting encoding progress monitoring")
     while True:
@@ -120,11 +133,14 @@ async def encode_video(dl, out, nn, wah):
         # Throttle updates to avoid Telegram API limits
         current_time = time.time()
         if current_time - last_update_time >= update_interval:
+            # Calculate elapsed encoding time and format it nicely
             elapsed_time = current_time - start_time
+            elapsed_time_str = ts(int(elapsed_time * 1000))  # Convert to milliseconds for ts function
+            
             percentage = min(100, (encoded_time / total_duration) * 100)
             logger.info(f"Encoding progress: {percentage:.2f}%")
             progress_bar = generate_progress_bar(percentage)
-            
+
             # Calculate encoding speed (in seconds of video per second of real time)
             if elapsed_time > 0:
                 encoding_speed = encoded_time / elapsed_time
@@ -132,20 +148,20 @@ async def encode_video(dl, out, nn, wah):
                 # Use the last 5 speeds to calculate average speed
                 recent_speeds = encoding_speeds[-5:] if len(encoding_speeds) >= 5 else encoding_speeds
                 avg_speed = sum(recent_speeds) / len(recent_speeds)
-                
+
                 # Calculate estimated time remaining
                 remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
                 eta = str(timedelta(seconds=int(remaining_seconds)))
-                
+
                 # Get system stats
                 stats = get_system_stats()
-                
+
                 # Get current output file size
                 try:
                     if Path(out).exists():
                         cur_size = int(Path(out).stat().st_size)
                         cur_size_str = hbs(cur_size)
-                        
+
                         # Calculate compression percentage
                         if org_size > 0:
                             compression_percent = 100 - ((cur_size / org_size) * 100)
@@ -159,8 +175,8 @@ async def encode_video(dl, out, nn, wah):
                     logger.error(f"Error getting current file size: {str(e)}")
                     cur_size_str = "calculating..."
                     compression_str = "calculating..."
-                
-                # Create the status message with file size information
+
+                # Create the status message with file size information and elapsed times
                 status_message = (
                     f"**🗜 Compressing...**\n"
                     f"{progress_bar} {percentage:.2f}%\n\n"
@@ -169,10 +185,12 @@ async def encode_video(dl, out, nn, wah):
                     f"**💯 Compression:** {compression_str}\n\n"
                     f"**⏱️ ETA:** {eta}\n"
                     f"**🚀 Speed:** {avg_speed:.2f}x\n"
+                    f"**⌛ Download Time:** {download_time_str}\n"
+                    f"**⏳ Encoding Time:** {elapsed_time_str}\n"
                     f"**💻 CPU:** {stats['cpu']}%\n"
                     f"**🧠 RAM:** {stats['ram_used']} ({stats['ram_percent']}%)"
                 )
-                
+
                 try:
                     await nn.edit(
                         status_message,
@@ -191,6 +209,10 @@ async def encode_video(dl, out, nn, wah):
     logger.info("Encoding process completed, waiting for final output")
     stdout, stderr = await process.communicate()
     error_output = stderr.decode()
+
+    # Calculate total encoding time
+    total_encoding_time = time.time() - start_time
+    logger.info(f"Total encoding time: {ts(int(total_encoding_time * 1000))}")
 
     if error_output:
         logger.error(f"FFMPEG error output: {error_output}")
