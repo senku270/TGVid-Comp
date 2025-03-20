@@ -2,10 +2,124 @@
 #    Copyright (c) 2021 Danish_00
 #    Script Improved by Zylern
 
+import re
 import time
+import asyncio
+import logging
+from pathlib import Path
+from datetime import datetime as dt
+from telethon import Button
 from .FastTelethon import download_file, upload_file
 from .funcn import *
 from .config import *
+
+# Configure detailed logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S'
+)
+logger = logging.getLogger("VideoEncoder")
+
+
+async def get_video_duration(video_path):
+    """Get video duration in seconds using ffprobe"""
+    logger.info(f"Getting duration for video: {video_path}")
+    cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{video_path}"'
+    logger.debug(f"Running command: {cmd}")
+    
+    process = await asyncio.create_subprocess_shell(
+        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+    stdout, stderr = await process.communicate()
+    
+    try:
+        duration = float(stdout.decode().strip())
+        logger.info(f"Video duration: {duration} seconds")
+        return duration
+    except Exception as e:
+        # Default to 1 if we can't get duration to avoid division by zero
+        error_msg = stderr.decode()
+        logger.error(f"Error getting video duration: {error_msg}")
+        logger.error(f"Exception: {str(e)}")
+        LOGS.info(f"Error getting video duration: {error_msg}")
+        return 1
+
+
+def generate_progress_bar(percentage):
+    """Generate a text-based progress bar"""
+    bar_length = 20  # Length of the progress bar
+    filled_length = int(bar_length * percentage / 100)
+    bar = "█" * filled_length + "░" * (bar_length - filled_length)
+    logger.debug(f"Generated progress bar at {percentage:.2f}%: {bar}")
+    return f"[{bar}]"
+
+
+async def encode_video(dl, out, nn, wah):
+    """Encode video with live progress updates"""
+    logger.info(f"Starting video encoding: {dl} -> {out}")
+    cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
+    logger.debug(f"Running command: {cmd}")
+    
+    process = await asyncio.create_subprocess_shell(
+        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+    )
+
+    total_duration = await get_video_duration(dl)  # Get video duration in seconds
+    logger.info(f"Total video duration: {total_duration} seconds")
+    
+    encoded_time = 0
+    update_interval = 3  # Update the progress message every 3 seconds
+    last_update_time = time.time()
+    
+    logger.info("Starting encoding progress monitoring")
+    while True:
+        line = await process.stdout.readline()
+        if not line:
+            logger.debug("Reached end of ffmpeg output")
+            break
+            
+        line = line.decode().strip()
+        logger.debug(f"FFMPEG progress line: {line}")
+
+        if "out_time_ms=" in line:  # Extract the encoding progress
+            match = re.search(r"out_time_ms=(\d+)", line)
+            if match:
+                encoded_time = int(match.group(1)) / 1_000_000  # Convert to seconds
+                logger.debug(f"Encoded time: {encoded_time:.2f}s / {total_duration:.2f}s")
+
+        # Throttle updates to avoid Telegram API limits
+        current_time = time.time()
+        if current_time - last_update_time >= update_interval:
+            percentage = min(100, (encoded_time / total_duration) * 100)
+            logger.info(f"Encoding progress: {percentage:.2f}%")
+            progress_bar = generate_progress_bar(percentage)
+            
+            try:
+                await nn.edit(
+                    f"**🗜 Compressing...**\n{progress_bar} {percentage:.2f}%",
+                    buttons=[
+                        [Button.inline("STATS", data=f"stats{wah}")],
+                        [Button.inline("CANCEL", data=f"skip{wah}")],
+                    ],
+                )
+                logger.debug("Successfully updated progress message")
+                last_update_time = current_time
+            except Exception as e:
+                error_msg = str(e)
+                logger.error(f"Progress update error: {error_msg}")
+                LOGS.info(f"Progress update error: {error_msg}")
+
+    logger.info("Encoding process completed, waiting for final output")
+    stdout, stderr = await process.communicate()
+    error_output = stderr.decode()
+    
+    if error_output:
+        logger.error(f"FFMPEG error output: {error_output}")
+    else:
+        logger.info("Encoding completed successfully")
+        
+    return error_output
 
 
 async def stats(e):
@@ -68,12 +182,10 @@ async def dl_link(event):
             [Button.inline("CANCEL", data=f"skip{wah}")],
         ],
     )
-    cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y"""
-    process = await asyncio.create_subprocess_shell(
-        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-    )
-    stdout, stderr = await process.communicate()
-    er = stderr.decode()
+    
+    # Use the new encoding function with progress bar
+    er = await encode_video(dl, out, nn, wah)
+    
     try:
         if er:
             await xxx.edit(str(er) + "\n\n**ERROR**")
@@ -82,6 +194,7 @@ async def dl_link(event):
             return os.remove(out)
     except BaseException:
         pass
+    
     ees = dt.now()
     ttt = time.time()
     await nn.delete()
@@ -203,12 +316,10 @@ async def encod(event):
                 [Button.inline("CANCEL", data=f"skip{wah}")],
             ],
         )
-        cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y"""
-        process = await asyncio.create_subprocess_shell(
-            cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
-        )
-        stdout, stderr = await process.communicate()
-        er = stderr.decode()
+        
+        # Use the new encoding function with progress bar
+        er = await encode_video(dl, out, nn, wah)
+        
         try:
             if er:
                 await e.edit(str(er) + "\n\n**ERROR**")
@@ -217,6 +328,7 @@ async def encod(event):
                 return os.remove(out)
         except BaseException:
             pass
+        
         ees = dt.now()
         ttt = time.time()
         await nn.delete()
