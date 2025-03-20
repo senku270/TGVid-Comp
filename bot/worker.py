@@ -6,8 +6,9 @@ import re
 import time
 import asyncio
 import logging
+import psutil
 from pathlib import Path
-from datetime import datetime as dt
+from datetime import datetime as dt, timedelta
 from telethon import Button
 from .FastTelethon import download_file, upload_file
 from .funcn import *
@@ -27,12 +28,12 @@ async def get_video_duration(video_path):
     logger.info(f"Getting duration for video: {video_path}")
     cmd = f'ffprobe -v error -show_entries format=duration -of default=noprint_wrappers=1:nokey=1 "{video_path}"'
     logger.debug(f"Running command: {cmd}")
-    
+
     process = await asyncio.create_subprocess_shell(
         cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
     stdout, stderr = await process.communicate()
-    
+
     try:
         duration = float(stdout.decode().strip())
         logger.info(f"Video duration: {duration} seconds")
@@ -55,12 +56,33 @@ def generate_progress_bar(percentage):
     return f"[{bar}]"
 
 
+def get_system_stats():
+    """Get current system stats (CPU, RAM)"""
+    try:
+        cpu_percent = psutil.cpu_percent(interval=0.5)
+        ram = psutil.virtual_memory()
+        ram_percent = ram.percent
+        ram_used = f"{ram.used / (1024 ** 3):.2f} GB"
+        return {
+            "cpu": cpu_percent,
+            "ram_percent": ram_percent,
+            "ram_used": ram_used
+        }
+    except Exception as e:
+        logger.error(f"Error getting system stats: {str(e)}")
+        return {
+            "cpu": 0,
+            "ram_percent": 0,
+            "ram_used": "0 GB"
+        }
+
+
 async def encode_video(dl, out, nn, wah):
-    """Encode video with live progress updates"""
+    """Encode video with live progress updates including file size information"""
     logger.info(f"Starting video encoding: {dl} -> {out}")
     cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
     logger.debug(f"Running command: {cmd}")
-    
+
     process = await asyncio.create_subprocess_shell(
         cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
     )
@@ -68,17 +90,24 @@ async def encode_video(dl, out, nn, wah):
     total_duration = await get_video_duration(dl)  # Get video duration in seconds
     logger.info(f"Total video duration: {total_duration} seconds")
     
+    # Get original file size
+    org_size = int(Path(dl).stat().st_size)
+    org_size_str = hbs(org_size)
+    logger.info(f"Original file size: {org_size_str}")
+
     encoded_time = 0
+    start_time = time.time()
     update_interval = 3  # Update the progress message every 3 seconds
-    last_update_time = time.time()
-    
+    last_update_time = start_time
+    encoding_speeds = []  # To track encoding speed over time
+
     logger.info("Starting encoding progress monitoring")
     while True:
         line = await process.stdout.readline()
         if not line:
             logger.debug("Reached end of ffmpeg output")
             break
-            
+
         line = line.decode().strip()
         logger.debug(f"FFMPEG progress line: {line}")
 
@@ -91,62 +120,110 @@ async def encode_video(dl, out, nn, wah):
         # Throttle updates to avoid Telegram API limits
         current_time = time.time()
         if current_time - last_update_time >= update_interval:
+            elapsed_time = current_time - start_time
             percentage = min(100, (encoded_time / total_duration) * 100)
             logger.info(f"Encoding progress: {percentage:.2f}%")
             progress_bar = generate_progress_bar(percentage)
             
-            try:
-                await nn.edit(
-                    f"**🗜 Compressing...**\n{progress_bar} {percentage:.2f}%",
-                    buttons=[
-                        [Button.inline("STATS", data=f"stats{wah}")],
-                        [Button.inline("CANCEL", data=f"skip{wah}")],
-                    ],
+            # Calculate encoding speed (in seconds of video per second of real time)
+            if elapsed_time > 0:
+                encoding_speed = encoded_time / elapsed_time
+                encoding_speeds.append(encoding_speed)
+                # Use the last 5 speeds to calculate average speed
+                recent_speeds = encoding_speeds[-5:] if len(encoding_speeds) >= 5 else encoding_speeds
+                avg_speed = sum(recent_speeds) / len(recent_speeds)
+                
+                # Calculate estimated time remaining
+                remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
+                eta = str(timedelta(seconds=int(remaining_seconds)))
+                
+                # Get system stats
+                stats = get_system_stats()
+                
+                # Get current output file size
+                try:
+                    if Path(out).exists():
+                        cur_size = int(Path(out).stat().st_size)
+                        cur_size_str = hbs(cur_size)
+                        
+                        # Calculate compression percentage
+                        if org_size > 0:
+                            compression_percent = 100 - ((cur_size / org_size) * 100)
+                            compression_str = f"{compression_percent:.2f}%"
+                        else:
+                            compression_str = "N/A"
+                    else:
+                        cur_size_str = "0 B"
+                        compression_str = "N/A"
+                except Exception as e:
+                    logger.error(f"Error getting current file size: {str(e)}")
+                    cur_size_str = "calculating..."
+                    compression_str = "calculating..."
+                
+                # Create the status message with file size information
+                status_message = (
+                    f"**🗜 Compressing...**\n"
+                    f"{progress_bar} {percentage:.2f}%\n\n"
+                    f"**📊 Original Size:** {org_size_str}\n"
+                    f"**📉 Current Size:** {cur_size_str}\n"
+                    f"**💯 Compression:** {compression_str}\n\n"
+                    f"**⏱️ ETA:** {eta}\n"
+                    f"**🚀 Speed:** {avg_speed:.2f}x\n"
+                    f"**💻 CPU:** {stats['cpu']}%\n"
+                    f"**🧠 RAM:** {stats['ram_used']} ({stats['ram_percent']}%)"
                 )
-                logger.debug("Successfully updated progress message")
-                last_update_time = current_time
-            except Exception as e:
-                error_msg = str(e)
-                logger.error(f"Progress update error: {error_msg}")
-                LOGS.info(f"Progress update error: {error_msg}")
+                
+                try:
+                    await nn.edit(
+                        status_message,
+                        buttons=[
+                            [Button.inline("STATS", data=f"stats{wah}")],
+                            [Button.inline("CANCEL", data=f"skip{wah}")],
+                        ],
+                    )
+                    logger.debug("Successfully updated progress message")
+                    last_update_time = current_time
+                except Exception as e:
+                    error_msg = str(e)
+                    logger.error(f"Progress update error: {error_msg}")
+                    LOGS.info(f"Progress update error: {error_msg}")
 
     logger.info("Encoding process completed, waiting for final output")
     stdout, stderr = await process.communicate()
     error_output = stderr.decode()
-    
+
     if error_output:
         logger.error(f"FFMPEG error output: {error_output}")
     else:
         logger.info("Encoding completed successfully")
-        
+
     return error_output
 
-
 async def stats(e):
-    """Handle stats button press with better error handling and logging"""
+    """Handle stats button press with enhanced information"""
     try:
         wah = e.pattern_match.group(1).decode("UTF-8")
         logger.info(f"Stats button pressed with data: {wah}")
-        
+
         wh = decode(wah)
         logger.debug(f"Decoded data: {wh}")
-        
+
         if ";" not in wh:
             logger.error(f"Invalid data format: {wh}")
             return await e.answer("Invalid data format. Please try again.", cache_time=0, alert=True)
-            
+
         parts = wh.split(";")
         if len(parts) != 3:
             logger.error(f"Expected 3 parts in data, got {len(parts)}: {parts}")
             return await e.answer("Data format error. Please try again.", cache_time=0, alert=True)
-            
+
         out, dl, id = parts
-        
+
         # Check if files exist
         if not Path(out).exists() or not Path(dl).exists():
             logger.error(f"File not found. Output: {Path(out).exists()}, Download: {Path(dl).exists()}")
             return await e.answer("Files no longer exist. Process may have completed.", cache_time=0, alert=True)
-        
+
         # Get file sizes safely
         try:
             ot = hbs(int(Path(out).stat().st_size))
@@ -154,7 +231,7 @@ async def stats(e):
         except Exception as size_err:
             logger.error(f"Error getting file sizes: {size_err}")
             return await e.answer("Error reading file sizes. Please try again.", cache_time=0, alert=True)
-        
+
         # Calculate compression percentage
         try:
             org = int(Path(dl).stat().st_size)
@@ -164,17 +241,41 @@ async def stats(e):
         except Exception as calc_err:
             logger.error(f"Error calculating percentage: {calc_err}")
             per = "calculating..."
+
+        # Get system stats
+        sys_stats = get_system_stats()
         
+        # Get encoding speed (if available)
+        try:
+            # Get video duration
+            total_duration = await get_video_duration(dl)
+            # Check output file size for progress
+            if Path(out).exists():
+                # This is a rough estimate based on file size ratio
+                progress_ratio = Path(out).stat().st_size / Path(dl).stat().st_size
+                estimated_encoded_seconds = total_duration * progress_ratio
+                encoding_rate = f"{estimated_encoded_seconds / total_duration:.2f}x"
+            else:
+                encoding_rate = "calculating..."
+        except Exception as speed_err:
+            logger.error(f"Error calculating encoding speed: {speed_err}")
+            encoding_rate = "calculating..."
+
         processing_file_name = Path(dl).name.replace("_", " ")
-        
-        ans = f"Processing: {processing_file_name}\n\n" \
-              f"Original Size: {ov}\n" \
-              f"Compressed Size: {ot}\n" \
-              f"Saved: {per}"
-              
+
+        ans = (
+            f"📁 File: {processing_file_name}\n\n"
+            f"📊 Original Size: {ov}\n"
+            f"📉 Current Size: {ot}\n"
+            f"💯 Compression: {per}\n\n"
+            f"🚀 Speed: {encoding_rate}\n"
+            f"💻 CPU: {sys_stats['cpu']}%\n"
+            f"🧠 RAM: {sys_stats['ram_used']} ({sys_stats['ram_percent']}%)"
+        )
+
         logger.info(f"Sending stats answer: {ans}")
         await e.answer(ans, cache_time=0, alert=True)
-        
+
     except Exception as er:
         logger.error(f"Stats error: {er}", exc_info=True)
         LOGS.info(f"Stats error: {er}")
@@ -183,6 +284,7 @@ async def stats(e):
             cache_time=0, 
             alert=True
         )
+
 
 async def dl_link(event):
     if not event.is_private:
@@ -227,10 +329,10 @@ async def dl_link(event):
             [Button.inline("CANCEL", data=f"skip{wah}")],
         ],
     )
-    
-    # Use the new encoding function with progress bar
+
+    # Use the enhanced encoding function with progress bar
     er = await encode_video(dl, out, nn, wah)
-    
+
     try:
         if er:
             await xxx.edit(str(er) + "\n\n**ERROR**")
@@ -239,7 +341,7 @@ async def dl_link(event):
             return os.remove(out)
     except BaseException:
         pass
-    
+
     ees = dt.now()
     ttt = time.time()
     await nn.delete()
@@ -361,10 +463,10 @@ async def encod(event):
                 [Button.inline("CANCEL", data=f"skip{wah}")],
             ],
         )
-        
-        # Use the new encoding function with progress bar
+
+        # Use the enhanced encoding function with progress bar
         er = await encode_video(dl, out, nn, wah)
-        
+
         try:
             if er:
                 await e.edit(str(er) + "\n\n**ERROR**")
@@ -373,7 +475,7 @@ async def encod(event):
                 return os.remove(out)
         except BaseException:
             pass
-        
+
         ees = dt.now()
         ttt = time.time()
         await nn.delete()
