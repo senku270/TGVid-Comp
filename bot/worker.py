@@ -55,12 +55,11 @@ def generate_progress_bar(percentage):
     """Generate a progress bar in the desired style:
     ┃ [■■■■▤□□□□□□□□] 32.09%
     """
-    bar_length = 20
+    bar_length = 14
     if percentage >= 100:
         bar = "■" * bar_length
     else:
         filled = int(percentage / 100 * bar_length)
-        # One partial block if not fully complete
         if filled < bar_length:
             bar = "■" * filled + "▤" + "□" * (bar_length - filled - 1)
         else:
@@ -177,11 +176,10 @@ async def encode_video(dl, out, nn, wah, user_info):
         current_time = time.time()
         if current_time - last_update_time >= update_interval:
             elapsed_time = current_time - start_time
-            elapsed_str = format_elapsed(elapsed_time)
             percentage = min(100, (encoded_time / total_duration) * 100)
             progress_bar = generate_progress_bar(percentage)
 
-            # Compute average speed (in MB/s) using current output file size if available
+            # Get current output file size
             try:
                 if Path(out).exists():
                     cur_size = int(Path(out).stat().st_size)
@@ -192,12 +190,23 @@ async def encode_video(dl, out, nn, wah, user_info):
                 cur_size = 0
             speed_mb = (cur_size / (1024 * 1024)) / elapsed_time if elapsed_time > 0 else 0
 
-            # Estimated time remaining based on average speed over encoded duration (not video time)
+            # Compression percentage calculation
+            if org_size > 0:
+                compression_percent = 100 - ((cur_size / org_size) * 100)
+                compression_str = f"{compression_percent:.2f}%"
+            else:
+                compression_str = "N/A"
+
+            # Estimated remaining time (ETA) based on average speed
             avg_speed = encoded_time / elapsed_time if elapsed_time > 0 else 0
             remaining_seconds = (total_duration - encoded_time) / avg_speed if avg_speed > 0 else 0
             eta = str(timedelta(seconds=int(remaining_seconds)))
-            # Approximate completion: elapsed time + ETA + 2 seconds, shown as finish time stamp (HH:MM:SS)
-            approx_finish = dt.fromtimestamp(start_time + elapsed_time + remaining_seconds + 2).strftime("%H:%M:%S")
+
+            # Compute the two approximate completion values:
+            # Approx TM: Clock time when encoding will complete.
+            approx_tm = dt.fromtimestamp(start_time + elapsed_time + remaining_seconds + 1).strftime("%H:%M:%S")
+            # Approx PRO 2: Total time (elapsed + remaining) formatted.
+            approx_pro_2 = str(timedelta(seconds=int(elapsed_time + remaining_seconds)))
 
             # Get system stats
             stats = get_system_stats()
@@ -205,30 +214,20 @@ async def encode_video(dl, out, nn, wah, user_info):
             uptime = get_uptime()
             tasks_count = len(WORKING) + len(QUEUE) if (WORKING or QUEUE) else 0
 
-            # Current processed size string
-            try:
-                cur_size_str = hbs(cur_size)
-            except Exception:
-                cur_size_str = "calculating..."
-
-            # Build the new progress message as per the design
-            filename = Path(dl).name
+            # Build the new progress message with the requested formatting.
             status_message = (
-                f"┏ 🏷️ Name: {filename}\n"
-                f"┃ {progress_bar} {percentage:.2f}%\n"
-                f"┠ 🔄 Processed: {cur_size_str} of {org_size_str}\n"
-                f"┠ ✨ Status: Encoding | ETA: {eta}\n"
-                f"┠ ⏳ Approx Completion: {approx_finish}\n"
-                f"┠ 📶 Speed: {speed_mb:.2f}MB/s | Elapsed: {elapsed_str}\n"
-                f"┠ ⚙️ Engine: ffmpeg\n"
-                f"┠ 💠 Mode: Ffmpeg | {FFMPEG_VERSION}\n"
-                f"┠ 👤 User: {user_info[0]}\n"
-                f"┖ 🆔 ID: {user_info[1]}\n\n"
-                f"┏ 🤖 Bot Stats\n"
-                f"┠ 🚧 Tasks: {tasks_count}\n"
-                f"┠ 🖥️ CPU: {stats['cpu']}% | 📭 Free: {free_disk} [{free_disk_percent}]\n"
-                f"┠ 💿 RAM: [{stats['total_ram']}] {stats['ram_percent']}% | ⏰ UPTIME: {uptime}\n"
-                f"┖ 📥 DL: N/A | 📤 UL: N/A"
+                f"🗜 **Compressing...**\n"
+                f"{progress_bar} {percentage:.2f}%\n\n"
+                f"📊 **OS:** *{org_size_str}*\n"
+                f"📉 **CS:** *{hbs(cur_size)}*\n"
+                f"💯 **Compression:** *{compression_str}*\n\n"
+                f"⏱️ **ETA:** *{eta}* | ⏳ **Encoding Time:** *{timedelta(seconds=int(elapsed_time))}*\n\n"
+                f"🚀 **Speed:** *{speed_mb:.2f}x*\n"
+                f"⌛ **Download Time:** *{download_time_str}*\n"
+                f"⏳ **Approx TM:** **{approx_tm}** | **Approx PRO 2:** __**{approx_pro_2}**__ *(Total time taken)*\n\n"
+                f"🔁 **Tasks:** *{tasks_count}*\n"
+                f"💻 **CPU:** *{stats['cpu']}%* | 🧠 **RAM:** *{stats['ram_used']} ({stats['ram_percent']}%)*\n"
+                f"🗃️ **F STR:** *{free_disk} ({free_disk_percent})* | **Uptime:** *{uptime}*"
             )
 
             try:
@@ -412,7 +411,7 @@ async def dl_link(event):
     eees = dt.now()
     x = dtime
     xx = ts(int((ees - es).seconds) * 1000)
-    xxxx = ts(int((eees - ees).seconds) * 1000)
+    xxx_time = ts(int((eees - ees).seconds) * 1000)
     a1 = await info(dl, xxx)
     a2 = await info(out, xxx)
     dk = (f"<b>File Name:</b> {newFile}\n\n"
@@ -420,9 +419,9 @@ async def dl_link(event):
           f"<b>Encoded File Size:</b> {hbs(com)}\n"
           f"<b>Encoded Percentage:</b> {per}\n\n"
           f"<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n"
-          f"<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxxx}</i>")
+          f"<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx_time}</i>")
     ds = await event.client.send_file(
-        event.chat_id, file=ok, caption=dk, force_document=True, link_preview=False, thumb=thum, parse_mode="html"
+        event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
     )
     os.remove(dl)
     os.remove(out)
@@ -448,7 +447,7 @@ async def encod(event):
             xxx = await event.reply("**Adding To Queue...**")
             doc = event.media.document
             if doc.id in list(QUEUE.keys()):
-                return await xxx.edit("**This File is Already Added in Queue**")
+                return await xxx.edit("**This File is Already Added in QUEUE**")
             name = event.file.name
             if not name:
                 name = "video_" + dt.now().isoformat("_", "seconds") + ".mp4"
@@ -550,8 +549,8 @@ async def encod(event):
               f"<b>Encoded Percentage:</b> {per}\n\n"
               f"<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n"
               f"<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx_time}</i>")
-        ds = await e.client.send_file(
-            e.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
+        ds = await event.client.send_file(
+            event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
         )
         os.remove(dl)
         os.remove(out)
