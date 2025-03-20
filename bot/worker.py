@@ -123,21 +123,66 @@ async def encode_video(dl, out, nn, wah):
 
 
 async def stats(e):
+    """Handle stats button press with better error handling and logging"""
     try:
         wah = e.pattern_match.group(1).decode("UTF-8")
+        logger.info(f"Stats button pressed with data: {wah}")
+        
         wh = decode(wah)
-        out, dl, id = wh.split(";")
-        ot = hbs(int(Path(out).stat().st_size))
-        ov = hbs(int(Path(dl).stat().st_size))
-        processing_file_name = dl.replace(f"downloads/", "").replace(f"_", " ")
-        ans = f"Processing Media:\n{processing_file_name}\n\nDownloaded:\n{ov}\n\nCompressed:\n{ot}"
+        logger.debug(f"Decoded data: {wh}")
+        
+        if ";" not in wh:
+            logger.error(f"Invalid data format: {wh}")
+            return await e.answer("Invalid data format. Please try again.", cache_time=0, alert=True)
+            
+        parts = wh.split(";")
+        if len(parts) != 3:
+            logger.error(f"Expected 3 parts in data, got {len(parts)}: {parts}")
+            return await e.answer("Data format error. Please try again.", cache_time=0, alert=True)
+            
+        out, dl, id = parts
+        
+        # Check if files exist
+        if not Path(out).exists() or not Path(dl).exists():
+            logger.error(f"File not found. Output: {Path(out).exists()}, Download: {Path(dl).exists()}")
+            return await e.answer("Files no longer exist. Process may have completed.", cache_time=0, alert=True)
+        
+        # Get file sizes safely
+        try:
+            ot = hbs(int(Path(out).stat().st_size))
+            ov = hbs(int(Path(dl).stat().st_size))
+        except Exception as size_err:
+            logger.error(f"Error getting file sizes: {size_err}")
+            return await e.answer("Error reading file sizes. Please try again.", cache_time=0, alert=True)
+        
+        # Calculate compression percentage
+        try:
+            org = int(Path(dl).stat().st_size)
+            com = int(Path(out).stat().st_size)
+            pe = 100 - ((com / org) * 100)
+            per = f"{pe:.2f}%"
+        except Exception as calc_err:
+            logger.error(f"Error calculating percentage: {calc_err}")
+            per = "calculating..."
+        
+        processing_file_name = Path(dl).name.replace("_", " ")
+        
+        ans = f"Processing: {processing_file_name}\n\n" \
+              f"Original Size: {ov}\n" \
+              f"Compressed Size: {ot}\n" \
+              f"Saved: {per}"
+              
+        logger.info(f"Sending stats answer: {ans}")
         await e.answer(ans, cache_time=0, alert=True)
+        
     except Exception as er:
-        LOGS.info(er)
+        logger.error(f"Stats error: {er}", exc_info=True)
+        LOGS.info(f"Stats error: {er}")
         await e.answer(
-            "Someting Went Wrong.\nSend Media Again.", cache_time=0, alert=True
+            "Something went wrong while retrieving stats. Please try again.", 
+            cache_time=0, 
+            alert=True
         )
-
 
 async def dl_link(event):
     if not event.is_private:
