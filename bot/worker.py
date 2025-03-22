@@ -123,13 +123,30 @@ def format_elapsed(seconds):
 async def encode_video(dl, out, nn, wah, user_info):
     """Encode video with live progress updates using new progress layout.
     user_info is a tuple: (username, user_id)
+    Limited to 350MB RAM
     """
-    logger.info(f"Starting video encoding: {dl} -> {out}")
-    cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
+    logger.info(f"Starting video encoding with RAM limit: {dl} -> {out}")
+    
+    # Add memory limit to ffmpeg command using -memory_size parameter (in bytes)
+    # 350MB = 350 * 1024 * 1024 = 367001600 bytes
+    memory_limit_bytes = 350 * 1024 * 1024
+    
+    cmd = f"""ffmpeg -i "{dl}" -memory_size {memory_limit_bytes} {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
     logger.debug(f"Running command: {cmd}")
 
+    # Create subprocess with resource limits
+    import resource
+    
+    # Function to set memory limits as preexec_fn for subprocess
+    def limit_memory():
+        # Set soft limit to 350MB
+        resource.setrlimit(resource.RLIMIT_AS, (memory_limit_bytes, memory_limit_bytes))
+        
     process = await asyncio.create_subprocess_shell(
-        cmd, stdout=asyncio.subprocess.PIPE, stderr=asyncio.subprocess.PIPE
+        cmd, 
+        stdout=asyncio.subprocess.PIPE, 
+        stderr=asyncio.subprocess.PIPE,
+        preexec_fn=limit_memory  # Apply resource limits before executing
     )
 
     total_duration = await get_video_duration(dl)
@@ -145,7 +162,7 @@ async def encode_video(dl, out, nn, wah, user_info):
     last_update_time = start_time
     encoding_speeds = []
 
-    logger.info("Starting encoding progress monitoring")
+    logger.info("Starting encoding progress monitoring with 350MB RAM limit")
     while True:
         line = await process.stdout.readline()
         if not line:
