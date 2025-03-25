@@ -177,6 +177,13 @@ async def encode_video(dl, out, nn, wah, user_info):
             eta = str(timedelta(seconds=int(remaining_seconds)))
             est = str(timedelta(seconds=int(elapsed_time + remaining_seconds)))  # Total estimated time
 
+            # Calculate estimated final file size based on progress
+            if percentage > 0:
+                estimated_size = cur_size / (percentage / 100)
+                estimated_size_str = hbs(int(estimated_size))
+            else:
+                estimated_size_str = "calculating..."
+
             stats = get_system_stats()
             free_disk, free_disk_percent = get_disk_stats()
             uptime = get_uptime()
@@ -185,9 +192,10 @@ async def encode_video(dl, out, nn, wah, user_info):
             status_message = (
                 f"**⎘** __{Path(dl).name}__ | __{percentage:.2f}%__ **⟳**\n"
                 f"{progress_bar}\n"
-                f"**❖** 𝗢𝗚: __{org_size_str}__ **→** 𝗘𝗡𝗖: __{hbs(cur_size)}__ **__({compression_str})__**\n\n"
+                f"**❖** 𝗢𝗚: __{org_size_str}__ **→** 𝗘𝗡𝗖: __{hbs(cur_size)}__ **__({compression_str})__**\n"
+                f"**📏** Estimated Size: __{estimated_size_str}__\n\n"
                 f"**⚡** 𝗦𝗣𝗘𝗘𝗗: **__{encoding_speed:.2f}x__**  | ** ⧖** 𝗘𝗧𝗔: __{eta}__\n"
-                f"** ⧗** 𝗘𝗟𝗧: __{timedelta(seconds=int(elapsed_time))}__  | **⌖** 𝗘𝗦𝗧: **__{est}__""\n\n"
+                f"** ⧗** 𝗘𝗟𝗧: __{timedelta(seconds=int(elapsed_time))}__  | **⌖** 𝗘𝗦𝗧: **__{est}__**\n\n"
                 f"** ᚛᚜** 𝗧𝗔𝗦𝗞: __{tasks_count}__ | **⌬** 𝗖𝗣𝗨: __{stats['cpu']}%__ | ** 🜁** 𝗥𝗔𝗠: __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
                 f"**⌸** 𝗙 𝗦𝗧𝗢𝗥𝗔𝗚𝗘: __{free_disk}__ (__{free_disk_percent}__)"
             )
