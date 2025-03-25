@@ -8,7 +8,7 @@ from .config import *
 from .worker import *
 from .devtools import *
 from .FastTelethon import *
-from cpu import register_cpu_handler
+from .cpu import register_cpu_handler
 from aiohttp import web
 import asyncio
 LOGS.info("Starting...")
