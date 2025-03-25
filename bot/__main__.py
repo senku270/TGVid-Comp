@@ -279,6 +279,8 @@ async def something():
         except Exception as err:
             LOGS.info(err)
 
+register_cpu_handler(bot)
+
 async def startup():
     await start_health_server()  # Start health check server
 
