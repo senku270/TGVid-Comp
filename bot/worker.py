@@ -400,7 +400,7 @@ async def encod(event):
     try:
         if not event.is_private:
             return
-        event.sender
+        # Only allow authorized users.
         if str(event.sender_id) not in OWNER and event.sender_id != DEV:
             return await event.reply("**Sorry You're not An Authorised User!**")
         if not event.media:
@@ -410,6 +410,8 @@ async def encod(event):
                 return
         else:
             return
+
+        # Handle queued files
         if WORKING or QUEUE:
             time.sleep(2)
             xxx = await event.reply("**Adding To Queue...**")
@@ -421,6 +423,7 @@ async def encod(event):
                 name = "video_" + dt.now().isoformat("_", "seconds") + ".mp4"
             QUEUE.update({doc.id: [name, doc]})
             return await xxx.edit("**Added This File in Queue**")
+
         WORKING.append(1)
         xxx = await event.reply("**📥 Downloading...**")
         s = dt.now()
@@ -468,14 +471,17 @@ async def encod(event):
         wah = code(hehe)
         # Pass user info: (username, user id)
         user_info = (getattr(event.sender, "username", None) or event.sender.first_name, event.sender_id)
+        
+        # Set initial compressing message with an estimated size placeholder.
         nn = await e.edit(
-            "**🗜 Compressing...**",
+            "**🗜 Compressing...**\n**📏** Estimated Size: __calculating...__",
             buttons=[
                 [Button.inline("STATS", data=f"stats{wah}")],
                 [Button.inline("CANCEL", data=f"skip{wah}")],
             ],
         )
 
+        # Call the updated encode_video which handles progress updates (including estimated size)
         er = await encode_video(dl, out, nn, wah, user_info)
 
         try:
