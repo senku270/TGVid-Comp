@@ -2,6 +2,7 @@ aiohttp
 python-decouple
 pyaesni
 psutil
+flask
 speedtest-cli
 lxml_html_clean
 https://github.com/1Danish-00/Telethon/archive/master.zip
