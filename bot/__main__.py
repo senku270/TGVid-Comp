@@ -9,6 +9,7 @@ from .worker import *
 from .devtools import *
 from .FastTelethon import *
 from .cpu import register_cpu_handler
+from .alive import keep_alive
 from aiohttp import web
 import asyncio
 LOGS.info("Starting...")
@@ -281,6 +282,7 @@ async def something():
             LOGS.info(err)
 
 register_cpu_handler(bot)
+keep_alive()
 
 async def startup():
     await start_health_server()  # Start health check server
