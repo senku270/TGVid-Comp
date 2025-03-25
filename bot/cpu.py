@@ -2,7 +2,7 @@ import psutil
 import platform
 from pyrogram import Client, filters
 
-@Client.on_message(filters.command("cpu"))
+@bot.on_message(filters.command("cpu"))
 async def cpu_info(client, message):
     cpu_name = platform.processor()
     physical_cores = psutil.cpu_count(logical=False)
