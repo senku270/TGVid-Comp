@@ -214,7 +214,7 @@ async def encode_video(dl, out, nn, wah, user_info):
 
             status_message = (
                 f"**🎬** __{processing_filename}__\n"
-                f"🔄 **Progress:** {progress_bar}\n"
+                f"🔄 **Progress:** {progress_bar} • __{percentage:.2f}%__\n"
                 f"**⏳ Remaining [ETA]:** `{eta}`\n"
                 f"**⌛ Total Estimated:** `{est}`\n\n"
                 f"📁 **File Details**\n"
