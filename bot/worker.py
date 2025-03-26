@@ -50,6 +50,27 @@ async def get_video_duration(video_path):
         LOGS.info(f"Error getting video duration: {error_msg}")
         return 1
 
+def truncate_filename(filename, max_length=25):
+    """
+    Truncate filename if it exceeds max_length, preserving file extension.
+    
+    Args:
+        filename (str): Original filename
+        max_length (int, optional): Maximum length before truncation. Defaults to 25.
+    
+    Returns:
+        str: Truncated filename
+    """
+    if len(filename) <= max_length:
+        return filename
+    
+    # Split filename and extension
+    name, ext = os.path.splitext(filename)
+    
+    # Truncate name part
+    truncated_name = name[:max_length-3-len(ext)] + "..."
+    
+    return f"{truncated_name}{ext}"
 
 def generate_progress_bar(percentage):
     """Generate a progress bar in the desired style:
@@ -121,8 +142,8 @@ def format_elapsed(seconds):
     return f"{minutes}m, {sec}s"
 
 async def encode_video(dl, out, nn, wah, user_info):
-    """Encode video with live progress updates using new progress layout.
-    user_info is a tuple: (username, user_id)
+    """
+    Updated encode_video function with enhanced progress tracking and display.
     """
     logger.info(f"Starting video encoding: {dl} -> {out}")
     cmd = f"""ffmpeg -i "{dl}" {ffmpegcode[0]} "{out}" -y -progress pipe:1 -nostats"""
@@ -139,11 +160,13 @@ async def encode_video(dl, out, nn, wah, user_info):
     org_size_str = hbs(org_size)
     logger.info(f"Original file size: {org_size_str}")
 
+    # Truncate filename
+    processing_filename = truncate_filename(Path(dl).name)
+
     encoded_time = 0
     start_time = time.time()
     update_interval = 3  # seconds
     last_update_time = start_time
-    encoding_speeds = []
 
     logger.info("Starting encoding progress monitoring")
     while True:
@@ -190,14 +213,24 @@ async def encode_video(dl, out, nn, wah, user_info):
             tasks_count = len(WORKING) + len(QUEUE) if (WORKING or QUEUE) else 0
 
             status_message = (
-                f"**⎘** __{Path(dl).name}__ | __{percentage:.2f}%__ **⟳**\n"
-                f"{progress_bar}\n"
-                f"**❖** 𝗢𝗚: __{org_size_str}__ **→** 𝗘𝗡𝗖: __{hbs(cur_size)}__ **__({compression_str})__**\n"
-                f"**📏** Estimated Size: __{estimated_size_str}__\n\n"
-                f"**⚡** 𝗦𝗣𝗘𝗘𝗗: **__{encoding_speed:.2f}x__**  | ** ⧖** 𝗘𝗧𝗔: __{eta}__\n"
-                f"** ⧗** 𝗘𝗟𝗧: __{timedelta(seconds=int(elapsed_time))}__  | **⌖** 𝗘𝗦𝗧: **__{est}__**\n\n"
-                f"** ᚛᚜** 𝗧𝗔𝗦𝗞: __{tasks_count}__ | **⌬** 𝗖𝗣𝗨: __{stats['cpu']}%__ | ** 🜁** 𝗥𝗔𝗠: __{stats['ram_used']} ({stats['ram_percent']}%)__\n"
-                f"**⌸** 𝗙 𝗦𝗧𝗢𝗥𝗔𝗚𝗘: __{free_disk}__ (__{free_disk_percent}__)"
+                f"**🎬** __{processing_filename}__\n"
+                f"🔄 **Progress:** {progress_bar}\n"
+                f"**⏳ Remaining [ETA]:** `{eta}`\n"
+                f"**⌛ Total Estimated:** `{est}`\n\n"
+                f"📁 **File Details**\n"
+                f"• **Original Size:** `{org_size_str}`\n"
+                f"• **Encoded Size:** `{hbs(cur_size)}`\n"
+                f"• **Estimated Final Size:** `{estimated_size_str}`\n"
+                f"• **Compression Rate:** `{compression_str}`\n\n"
+                f"⏳ **Time & Performance**\n"
+                f"• **Speed:** `{encoding_speed:.2f}x`\n"
+                f"• **Elapsed:** `{timedelta(seconds=int(elapsed_time))}`\n\n"
+                f"💻 **System Resources**\n"
+                f"• **Tasks:** `{tasks_count}`\n"
+                f"• **Engine:** `Telethon | ffmpeg-vr`\n"
+                f"• **CPU:** `{stats['cpu']}% / 2.8GHz`\n"
+                f"• **RAM:** `{stats['ram_used']} / {stats['total_ram']}` **[{stats['ram_percent']}%]**\n"
+                f"• **Storage:** `{free_disk} / 128GB` **[{free_disk_percent}]**"
             )
 
             try:
