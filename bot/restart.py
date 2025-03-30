@@ -1,4 +1,4 @@
-from config import *
+from .config import *
 import os
 import sys
 import asyncio
