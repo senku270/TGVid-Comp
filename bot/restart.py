@@ -5,29 +5,25 @@ import asyncio
 import logging
 from telethon import events
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+# Configure logging
+LOGS = logging.getLogger("Restart_Bot")
 
-ADMIN_USER_ID = Config.OWNER  # Ensure this exists in config
+def register_restart_handler(bot):
+    @bot.on(events.NewMessage(pattern='/restart'))
+    async def restart_bot(event):
+        LOGS.info(f"Received /restart command from user: {event.sender_id}")
 
-# Flag to indicate if the bot is restarting
-is_restarting = False
+        if str(event.sender_id) not in Config.OWNER:  # Ensure this matches your config
+            return await event.reply("🚫 **You're not authorized to restart the bot!**")
 
-async def restart_bot(event):
-    global is_restarting
-    if str(event.sender_id) not in ADMIN_USER_ID:
-        return await event.reply("**🚫 You're not an authorized user!**")
-
-    if not is_restarting:
-        is_restarting = True
-        await event.reply("**🔄 Restarting bot...**")
-        logger.info("Restarting bot requested by %s", event.sender_id)
+        LOGS.info("Restarting bot in 2 seconds...")
+        await event.reply("🔄 **Restarting bot...**")
 
         # Gracefully disconnect the bot
         await bot.disconnect()
 
         # Non-blocking sleep before restart
-        await asyncio.sleep(2)  
+        await asyncio.sleep(2)
 
         # Restart the bot process
-        os.execl(sys.executable, sys.executable, *sys.argv)
+        os.execl(sys.executable, sys.executable, *sys.argv)ys.executable, *sys.argv)
