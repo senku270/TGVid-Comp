@@ -282,6 +282,7 @@ async def something():
             LOGS.info(err)
 
 register_cpu_handler(bot)
+register_restart_handler(bot)
 keep_alive()
 
 async def startup():
