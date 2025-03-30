@@ -26,4 +26,4 @@ def register_restart_handler(bot):
         await asyncio.sleep(2)
 
         # Restart the bot process
-        os.execl(sys.executable, sys.executable, *sys.argv)ys.executable, *sys.argv)
+        os.execl(sys.executable, sys.executable, *sys.argv)
