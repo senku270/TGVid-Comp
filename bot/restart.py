@@ -1,4 +1,4 @@
-from .config import * # Import directly without dot notation
+from .config import *
 import os
 import sys
 import asyncio
