@@ -12,7 +12,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 RUN apt -qq update && apt -qq install -y \
     git wget pv jq python3-dev ffmpeg mediainfo \
     build-essential cmake yasm nasm pkg-config libtool \
-    zlib1g-dev libssl-dev libass-dev libfdk-aac-dev \
+    zlib1g-dev libssl-dev libass-dev \
     libx264-dev libvpx-dev libx265-dev libfreetype6-dev \
     libfontconfig1-dev libfribidi-dev libharfbuzz-dev \
     && rm -rf /var/lib/apt/lists/*
