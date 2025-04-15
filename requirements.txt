@@ -7,5 +7,5 @@ requests
 flask
 speedtest-cli
 lxml_html_clean
-html_telegraph_poster
+https://github.com/DevsRef/html-telegraph-poster.git
 https://github.com/1Danish-00/Telethon/archive/master.zip
