@@ -2,6 +2,8 @@ aiohttp
 python-decouple
 pyaesni
 psutil
+wheel
+requests
 flask
 speedtest-cli
 lxml_html_clean
