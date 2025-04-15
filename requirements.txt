@@ -5,5 +5,5 @@ psutil
 flask
 speedtest-cli
 lxml_html_clean
-https://github.com/1Danish-00/Telethon/archive/master.zip
 html_telegraph_poster
+https://github.com/1Danish-00/Telethon/archive/master.zip
