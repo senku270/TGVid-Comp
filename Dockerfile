@@ -7,4 +7,5 @@ RUN apt-get install neofetch wget -y -f
 
 COPY . .
 RUN pip3 install -r requirements.txt
+EXPOSE 8000
 CMD ["bash","run.sh"]
