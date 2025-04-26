@@ -4,7 +4,8 @@ WORKDIR /bot
 ENV DEBIAN_FRONTEND=noninteractive
 
 # Update and install dependencies
-RUN apt -qq update && apt -qq install -y git wget pv jq python3-dev mediainfo
+# Added xz-utils to handle .tar.xz extraction
+RUN apt -qq update && apt -qq install -y git wget pv jq python3-dev mediainfo xz-utils
 RUN apt-get install neofetch -y -f
 
 # Download and install the specific FFmpeg build
