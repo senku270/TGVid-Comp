@@ -1,4 +1,16 @@
-    async def start_health_server(self):
+from aiohttp import web
+
+async def health_check(request):
+    return web.Response(text="OK")
+
+class HealthServer:
+    def __init__(self, host="0.0.0.0", port=8080):
+        self.host = host
+        self.port = port
+        self.health_app = None
+        self.runner = None
+
+    async def start(self):
         """Start the health check server"""
         try:
             self.health_app = web.Application()
@@ -6,23 +18,13 @@
 
             self.runner = web.AppRunner(self.health_app)
             await self.runner.setup()
-            site = web.TCPSite(self.runner, "0.0.0.0", 8080)
+            site = web.TCPSite(self.runner, self.host, self.port)
             await site.start()
-            print("Health check server started on port 8080")
+            print(f"Health check server started on port {self.port}")
         except Exception as e:
             print(f"Failed to start health server: {e}")
 
-    async def stop_health_server(self):
+    async def stop(self):
         """Stop the health check server"""
         if self.runner:
             await self.runner.cleanup()
-
-    async def start(self):
-        await super().start()
-        me = await self.get_me()
-        self.mention = me.mention
-        self.username = me.username
-        self.uptime = Config.BOT_UPTIME
-
-        # Start health check server regardless of webhook config
-        await self.start_health_server()
