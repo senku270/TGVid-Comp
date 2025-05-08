@@ -11,6 +11,9 @@ from .FastTelethon import *
 from .cpu import register_cpu_handler
 from .restart import register_restart_handler
 from .alive import keep_alive
+from .live import health_server
+
+
 from aiohttp import web
 import asyncio
 LOGS.info("Starting...")
@@ -287,7 +290,11 @@ register_restart_handler(bot)
 keep_alive()
 
 async def startup():
-    await start_health_server()  # Start health check server
+    await start_health_server()
+
+async def start():
+    await health_server.start()
+      
 
 ########### Start ############
 
