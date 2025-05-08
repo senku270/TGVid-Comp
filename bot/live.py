@@ -28,3 +28,6 @@ class HealthServer:
         """Stop the health check server"""
         if self.runner:
             await self.runner.cleanup()
+
+# This allows importing a default instance
+health_server = HealthServer()
