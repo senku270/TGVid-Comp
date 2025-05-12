@@ -6,6 +6,6 @@ wheel
 requests
 flask
 speedtest-cli
-lxml_html_clean
+lxml[html_clean]
 https://github.com/mercuree/html-telegraph-poster/archive/refs/heads/master.zip
 https://github.com/1Danish-00/Telethon/archive/master.zip
