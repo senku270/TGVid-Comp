@@ -1,6 +1,6 @@
 aiohttp
 python-decouple
-pyaesi
+pyaes
 psutil
 wheel
 requests
