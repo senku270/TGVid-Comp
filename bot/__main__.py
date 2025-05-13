@@ -13,22 +13,9 @@ from .restart import register_restart_handler
 from .alive import keep_alive
 from aiohttp import web
 import asyncio
-from pyrogram import Client, filters
-from pyrogram.types import Message
-from pyrogram.errors import FloodWait
-from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
-from pyrogram.types.messages_and_media import message
-from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
-LOGS.info("Starting...")
 
-bot = Client(
-    "bot",
-    api_id=API_ID,
-    api_hash=API_HASH,
-    bot_token=BOT_TOKEN
-)
-
+LOGS.info("Starting.)
 
 try:
     bot.start(bot_token=BOT_TOKEN)
@@ -57,27 +44,7 @@ async def start_health_server():
         LOGS.info(f"Failed to start health server: {e}")
 #test
 
-routes = web.RouteTableDef()
 
-@routes.get("/", allow_head=True)
-async def root_route_handler(request):
-    return web.json_response("https://github.com/AshutoshGoswami24")
-
-async def web_server():
-    web_app = web.Application(client_max_size=30000000)
-    web_app.add_routes(routes)
-    return web_app
-
-@bot.on_message(filters.command(["st"]))
-async def account_login(bot: Client, m: Message):
-    await m.reply_text(
-       Ashu.START_TEXT, reply_markup=InlineKeyboardMarkup(
-            [
-                    [
-                    InlineKeyboardButton("✜ ᴀsʜᴜᴛᴏsʜ ɢᴏsᴡᴀᴍɪ 𝟸𝟺 ✜" ,url="https://t.me/AshutoshGoswami24") ],
-                    [
-                    InlineKeyboardButton("🦋 𝐅𝐨𝐥𝐥𝐨𝐰 𝐌𝐞 🦋" ,url="https://t.me/AshuSupport") ]                               
-            ]))
 
 ####### GENERAL CMDS ########
 
