@@ -13,7 +13,17 @@ from .restart import register_restart_handler
 from .alive import keep_alive
 from aiohttp import web
 import asyncio
+
+
 LOGS.info("Starting...")
+
+bot = Client(
+    "bot",
+    api_id=API_ID,
+    api_hash=API_HASH,
+    bot_token=BOT_TOKEN
+)
+
 
 try:
     bot.start(bot_token=BOT_TOKEN)
