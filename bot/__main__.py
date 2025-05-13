@@ -50,6 +50,29 @@ async def start_health_server():
 
     except Exception as e:
         LOGS.info(f"Failed to start health server: {e}")
+#test
+
+routes = web.RouteTableDef()
+
+@routes.get("/", allow_head=True)
+async def root_route_handler(request):
+    return web.json_response("https://github.com/AshutoshGoswami24")
+
+async def web_server():
+    web_app = web.Application(client_max_size=30000000)
+    web_app.add_routes(routes)
+    return web_app
+
+@bot.on_message(filters.command(["st"]))
+async def account_login(bot: Client, m: Message):
+    await m.reply_text(
+       Ashu.START_TEXT, reply_markup=InlineKeyboardMarkup(
+            [
+                    [
+                    InlineKeyboardButton("✜ ᴀsʜᴜᴛᴏsʜ ɢᴏsᴡᴀᴍɪ 𝟸𝟺 ✜" ,url="https://t.me/AshutoshGoswami24") ],
+                    [
+                    InlineKeyboardButton("🦋 𝐅𝐨𝐥𝐥𝐨𝐰 𝐌𝐞 🦋" ,url="https://t.me/AshuSupport") ]                               
+            ]))
 
 ####### GENERAL CMDS ########
 
