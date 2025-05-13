@@ -13,7 +13,12 @@ from .restart import register_restart_handler
 from .alive import keep_alive
 from aiohttp import web
 import asyncio
-
+from pyrogram import Client, filters
+from pyrogram.types import Message
+from pyrogram.errors import FloodWait
+from pyrogram.errors.exceptions.bad_request_400 import StickerEmojiInvalid
+from pyrogram.types.messages_and_media import message
+from pyrogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 LOGS.info("Starting...")
 
