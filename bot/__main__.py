@@ -15,7 +15,7 @@ from aiohttp import web
 import asyncio
 
 
-LOGS.info("Starting.)
+LOGS.info("Starting")
 
 try:
     bot.start(bot_token=BOT_TOKEN)
