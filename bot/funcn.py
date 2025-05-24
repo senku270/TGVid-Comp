@@ -25,6 +25,27 @@ if not os.path.isdir("encode/"):
 if not os.path.isdir("thumb/"):
     os.mkdir("thumb/")
 
+tgp_client = TelegraphPoster(use_api=True, telegraph_api_url=TELEGRAPH_API)
+
+def create_api_token():
+    retries = 10
+    telgrph_tkn_err_msg = (
+        "Couldn't not successfully create api token required by telegraph to work"
+        "\nAs such telegraph is therefore disabled!"
+    )
+    while retries:
+        try:
+            tgp_client.create_api_token("Mediainfo")
+            break
+        except (requests.exceptions.ConnectionError, ConnectionError) as e:
+            retries -= 1
+            if not retries:
+                LOGS.info(telgrph_tkn_err_msg)
+                break
+            time.sleep(1)
+
+
+create_api_token()
 
 def stdr(seconds: int) -> str:
     minutes, seconds = divmod(seconds, 60)
@@ -130,23 +151,35 @@ async def sysinfo(e):
     return
 
 
-async def info(file, event):
-    process = subprocess.Popen(
-        ["mediainfo", file, "--Output=HTML"],
-        stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT,
-    )
-    stdout, stderr = process.communicate()
-    out = stdout.decode()
-    client = TelegraphPoster(use_api=True)
-    client.create_api_token("TGVid-Comp-Mediainfo")
-    page = client.post(
-        title="TGVid-Comp-Mediainfo",
-        author=((await event.client.get_me()).first_name),
-        author_url=f"https://t.me/{((await event.client.get_me()).username)}",
-        text=out,
-    )
-    return page["url"]
+async def info(file, event=None):
+    # depreciating second arg.
+    try:
+        author = (await bot.get_me()).first_name
+        author_url = f"https://t.me/{((await bot.get_me()).username)}"
+        out = pymediainfo.MediaInfo.parse(file, output="HTML", full=False)
+        if len(out) > 65536:
+            out = (
+                out[:65430]
+                + "<strong>...<strong><br><br><strong>(TRUNCATED DUE TO CONTENT EXCEEDING MAX LENGTH)<strong>"
+            )
+        retries = 10
+        while retries:
+            try:
+                page = tgp_client.post(
+                    title="Mediainfo",
+                    author=author,
+                    author_url=author_url,
+                    text=out,
+                )
+                break
+            except (requests.exceptions.ConnectionError, ConnectionError) as e:
+                retries -= 1
+                if not retries:
+                    raise e
+                await asyncio.sleep(1)
+        return page["url"]
+    except Exception:
+        return None
 
 
 def code(data):
