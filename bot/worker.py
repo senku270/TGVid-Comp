@@ -421,7 +421,7 @@ async def dl_link(event):
           f"<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n"
           f"<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx_time}</i>")
     ds = await event.client.send_file(
-        event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
+        event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, parse_mode="html"
     )
     os.remove(dl)
     os.remove(out)
@@ -555,7 +555,7 @@ async def encod(event):
               f"<b>Get Mediainfo Here:</b> <a href='{a1}'>Before</a>/<a href='{a2}'>After</a>\n\n"
               f"<i>Downloaded in {x}\nEncoded in {xx}\nUploaded in {xxx_time}</i>")
         ds = await event.client.send_file(
-            event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, thumb=thum, parse_mode="html"
+            event.chat_id, file=ok, force_document=True, caption=dk, link_preview=False, parse_mode="html"
         )
         os.remove(dl)
         os.remove(out)
