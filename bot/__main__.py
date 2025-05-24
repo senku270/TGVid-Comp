@@ -288,7 +288,6 @@ async def something():
 
 register_cpu_handler(bot)
 register_restart_handler(bot)
-keep_alive()
 
 async def startup():
     await start_health_server()
