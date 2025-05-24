@@ -496,7 +496,6 @@ async def encod(event):
         bb = kk.replace(f".{aa}", ".mkv")
         newFile = dl.replace("downloads/", "").replace("_", " ")
         out = f"{rr}/{bb}"
-        thum = "thumb.jpg"
         dtime = ts(int((es - s).seconds) * 1000)
         e = xxx
         hehe = f"{out};{dl};{event.sender_id}"
