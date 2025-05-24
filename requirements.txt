@@ -2,6 +2,7 @@ aiohttp
 python-decouple
 python-dotenv
 pyaes
+pymediainfo
 psutil
 wheel
 requests
