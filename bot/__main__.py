@@ -224,7 +224,6 @@ async def something():
                 rr = "encode"
                 bb = kk.replace(f".{aa}", ".mkv")
                 out = f"{rr}/{bb}"
-                thum = "thumb.jpg"
                 dtime = ts(int((es - s).seconds) * 1000)
                 hehe = f"{out};{dl};{list(QUEUE.keys())[0]}"
                 wah = code(hehe)
