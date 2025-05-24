@@ -366,7 +366,6 @@ async def dl_link(event):
     rr = "encode"
     bb = kk.replace(f".{aa}", ".mkv")
     out = f"{rr}/{bb}"
-    thum = "thumb.jpg"
     dtime = ts(int((es - s).seconds) * 1000)
     hehe = f"{out};{dl};{event.sender_id}"
     wah = code(hehe)
