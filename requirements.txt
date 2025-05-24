@@ -1,5 +1,6 @@
 aiohttp
 python-decouple
+python-dotenv
 pyaes
 psutil
 wheel
