@@ -16,7 +16,6 @@ WORKING = []
 QUEUE = {}
 OK = {}
 uptime = dt.now()
-os.system(f"wget {THUMBNAIL} -O thumb.jpg")
 
 if not os.path.isdir("downloads/"):
     os.mkdir("downloads/")
