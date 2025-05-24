@@ -10,7 +10,6 @@ from .devtools import *
 from .FastTelethon import *
 from .cpu import register_cpu_handler
 from .restart import register_restart_handler
-from .alive import keep_alive
 from aiohttp import web
 import asyncio
 
